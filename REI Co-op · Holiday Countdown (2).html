@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>REI Co-op · Holiday Countdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#10241C;      /* spruce night sky */
+    --pine:#2B5640;       /* forest ridge */
+    --ridge:#1A3529;      /* far ridge */
+    --snow:#FFFFFF;
+    --frost:#CFE1E6;      /* muted text */
+    --ember:#D2232A;      /* holiday red */
+    --lantern:#F0B64A;    /* warm gold */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent}
+  body{font-family:"Work Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--snow)}
+
+  /* 856 x 559 (about 3:2) at every width, 220px to 900px – same as the weather widget */
+  .widget{
+    container-type:inline-size;position:relative;overflow:hidden;isolation:isolate;
+    width:100%;min-width:220px;max-width:900px;margin:0 auto;
+    aspect-ratio:856 / 559;display:flex;flex-direction:column;
+    border-radius:clamp(10px,1.6cqi,14px);
+    background:
+      radial-gradient(120% 80% at 80% 0%, #1E4034 0%, transparent 60%),
+      linear-gradient(180deg, var(--night) 0%, #16302A 100%);
+  }
+  .widget{--accent:var(--ember);--accent-lbl:#FFE3E3}
+  .widget[data-h="hanukkah"]{--accent:#2F6DB5;--accent-lbl:#DCE8FF}
+  .widget[data-h="kwanzaa"]{--accent:#1F7A3E;--accent-lbl:#DDF3E4}
+  .widget[data-h="cybermonday"]{--accent:#2A7F8F;--accent-lbl:#D7F3F7}
+  canvas.snow{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+
+  .inner{position:relative;z-index:2;flex:1;min-height:0;display:flex;flex-direction:column;padding:2.6cqi 3.4cqi 0}
+
+  /* Header */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .badge{background:var(--snow);border-radius:clamp(4px,.9cqi,8px);padding:.55cqi .9cqi;display:inline-flex;line-height:0}
+  .logo{height:clamp(14px,4.2cqi,36px);width:auto;display:block}
+  .greet{font-family:"Bitter",Georgia,serif;font-weight:500;font-size:clamp(9px,1.7cqi,15px);color:var(--frost);text-align:right;line-height:1.3}
+
+  /* Holiday picker */
+  .tabs{display:flex;flex-wrap:wrap;gap:clamp(4px,.8cqi,7px);margin-top:clamp(5px,1.7cqi,15px)}
+  .tab{font:inherit;font-size:clamp(9px,1.55cqi,13px);font-weight:600;color:var(--frost);background:rgba(255,255,255,.06);
+       border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:.35em .95em;cursor:pointer;white-space:nowrap}
+  .tab .when{font-weight:500;opacity:.75;margin-left:.4em}
+  .tab[aria-pressed="true"]{background:var(--snow);color:var(--night);border-color:var(--snow)}
+  .tab:focus-visible{outline:2px solid var(--lantern);outline-offset:2px}
+
+  h1{font-family:"Bitter",Georgia,serif;font-weight:800;font-size:clamp(14px,4.3cqi,37px);line-height:1.1;
+     letter-spacing:-.01em;margin-top:clamp(5px,2cqi,18px)}
+  .sub{color:var(--frost);font-size:clamp(9px,1.65cqi,14px);margin-top:.3cqi}
+
+  /* Countdown */
+  .clock{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(4px,1.3cqi,11px);margin-top:clamp(5px,1.9cqi,16px)}
+  .unit{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:clamp(6px,1.2cqi,10px);
+        padding:1.2cqi 2px 1cqi;text-align:center}
+  .unit.days{background:var(--accent);border-color:var(--accent)}
+  .widget[data-h="kwanzaa"] .unit.days{background:linear-gradient(180deg,#C8102E 0 .6cqi,#111 .6cqi 1.2cqi,#1F7A3E 1.2cqi)}
+  .widget[data-h="cybermonday"] .unit.days{box-shadow:inset 0 0 0 2px #7FD3DE}
+  .num{font-family:"Bitter",Georgia,serif;font-weight:700;font-size:clamp(18px,7.2cqi,62px);line-height:1;font-variant-numeric:tabular-nums}
+  .lbl{font-size:clamp(8px,1.45cqi,13px);color:var(--frost);margin-top:.3cqi}
+  .unit.days .lbl{color:var(--accent-lbl)}
+
+  /* Celebration state */
+  .merry{display:none;text-align:center;margin-top:clamp(4px,1.6cqi,14px)}
+  .merry .big{font-family:"Bitter",Georgia,serif;font-weight:800;font-size:clamp(20px,7.2cqi,62px);color:var(--lantern);line-height:1.05}
+  .merry p{color:var(--frost);margin-top:.6cqi;font-size:clamp(9px,1.75cqi,15px)}
+  .widget.is-celebrating .clock{display:none}
+  .widget.is-celebrating .merry{display:block}
+
+  /* Trail to the summit */
+  .trail{position:relative;flex:0 0 auto;margin-top:-2cqi}
+  .trail svg{display:block;width:100%;height:auto}
+  .trail-meta{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    font-size:clamp(8px,1.45cqi,13px);color:var(--frost);background:var(--pine);
+    padding:.4cqi 3.4cqi 1.3cqi;margin-top:-1px}
+  .trail-meta strong{color:var(--lantern);font-weight:600}
+
+  @container (max-width:560px){
+    .tab .when,.greet{display:none}
+  }
+  @container (max-width:380px){
+    .sub,.trail-meta{display:none}
+    .tabs{gap:3px}
+    .tab{padding:.3em .7em}
+  }
+  @container (max-width:300px){
+    h1{display:none}
+    .logo{height:14px}
+    .tab{font-size:8.5px;padding:.3em .6em}
+    .clock,.merry{margin-top:6px}
+  }
+  @media (prefers-reduced-motion:reduce){ canvas.snow{display:none} .hiker{transition:none} }
+</style>
+</head>
+<body>
+<section class="widget" id="xmas" aria-labelledby="xmas-title">
+  <canvas class="snow" aria-hidden="true"></canvas>
+
+  <div class="inner">
+    <div class="top">
+      <span class="badge"><img class="logo" alt="REI Co-op" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAABUCAYAAABDep+IAAAAAXNSR0IArs4c6QAAAIRlWElmTU0AKgAAAAgABQESAAMAAAABAAEAAAEaAAUAAAABAAAASgEbAAUAAAABAAAAUgEoAAMAAAABAAIAAIdpAAQAAAABAAAAWgAAAAAAAACQAAAAAQAAAJAAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAISgAwAEAAAAAQAAAFQAAAAAVcsbtAAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAFxxJREFUeAHtnQWwJDUTgHOCO4fr4Vq4uxXuLgUcFO7ucrgdULi7u7vcIYW7FM473N01f3/h7yEzO5KZnd1973hdtTWzM0nHOm3pZPpYAdMLhT3w6quvmssuu8ysuOKKZpFFFjEjjzxyYZ4emQCC6IX8Hnj++eftMsssY4UI7Mwzz2xvvfVW+9tvv+Vn6qFvTQ+td9uqLZzBLrXUUo4YZMbDTe0ss8xir7rqKvvTTz+1rR7tKqiXIHJ6+o033rCLL754jBiUKCaeeGJ75pln2u+//z4HQ8971UsQGWP22muv2QUXXNCONNJIjisoIfjXccYZxx588MH2k08+ycDS8x73EkTKmL377rt2vvnmayCGvn372jHGGCP2fNRRR7U77LCDfeedd1Iw9bxHvQSRGDPERBoxwBlQLG+88Ua7zTbb2HHHHTfiHP3797frr7++Rfns6dBLEN4Ifvjhh3bWWWe1/fr1iwZbRcQUU0xh77jjDvv777/b7777zu611152wIABUTq4x7LLLmsfeOABD2Nrb//+++/aC6iVIP7880/79ddf288++6z2irYa4fvvv2/nmGMOy8AqEegVsXDaaae5tmk9fvjhB3vMMcdYCEXTcZ1//vntTTfdZP/66y9N2pLrl19+aV944YXa+7pWgkD2Hn300fb4449vSSe0CimcYeDAgbGB1UHu06eP0xGGDx/eUPwff/xhzz//fOeb8NNPP/309tRTT7W8r3sWg+/jjz+2W2yxheNQu+++u+3q6mqoW9UHtREEFb322mvtVFNNZZdffnn71ltvVa1T2/JR57ffftuJCR3Q5FW8km4mZs14uOJ1111n55577hhBwTmOOuooJ17qbNAzzzxjV1ttNTv66KO78nCWDRo0yOIvqQNqIwi07G233dZVctJJ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"></span>
+      <p class="greet">Happy holidays<br>from your co-op</p>
+    </div>
+
+    <div class="tabs" id="tabs" aria-label="Choose a holiday"></div>
+
+    <h1 id="xmas-title">Countdown to Christmas</h1>
+    <p class="sub" id="sub">Until December 25</p>
+
+    <div class="clock" role="timer" aria-live="off">
+      <div class="unit days"><div class="num" id="d">--</div><div class="lbl">days</div></div>
+      <div class="unit"><div class="num" id="h">--</div><div class="lbl">hours</div></div>
+      <div class="unit"><div class="num" id="m">--</div><div class="lbl">minutes</div></div>
+      <div class="unit"><div class="num" id="s">--</div><div class="lbl">seconds</div></div>
+    </div>
+
+    <div class="merry">
+      <div class="big" id="mbig">Merry Christmas</div>
+      <p id="mmsg">Thanks for all you do this season. Now go enjoy some time outside.</p>
+    </div>
+  </div>
+
+  <!-- Ridgeline: the season is a climb, Christmas is the summit -->
+  <div class="trail" aria-hidden="true">
+    <svg viewBox="0 0 900 170" preserveAspectRatio="none">
+      <path fill="var(--ridge)" d="M0 110 L90 70 L150 95 L240 40 L320 85 L410 55 L500 92 L600 48 L690 80 L780 60 L900 90 L900 170 L0 170Z"/>
+      <path id="ridge" fill="var(--pine)" d="M0 150 L120 128 L210 136 L330 104 L420 116 L540 80 L620 92 L740 46 L800 58 L860 30 L900 44 L900 170 L0 170Z"/>
+      <!-- snowcap on summit -->
+      <path fill="var(--snow)" opacity=".9" d="M845 38 L860 30 L878 39 L868 42 L860 37 L852 43Z"/>
+      <!-- trees -->
+      <g fill="#0F2219">
+        <path d="M60 152 l10 -26 l10 26z"/><path d="M78 152 l8 -20 l8 20z"/>
+        <path d="M250 140 l11 -28 l11 28z"/><path d="M270 138 l8 -20 l8 20z"/>
+        <path d="M470 118 l10 -26 l10 26z"/><path d="M660 98 l9 -24 l9 24z"/>
+      </g>
+      <!-- holiday illustrations along the ridge -->
+      <g id="scene"></g>
+      <!-- trail line (invisible guide) -->
+      <path id="path" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-dasharray="2 7"
+        d="M20 146 L120 128 L210 136 L330 104 L420 116 L540 80 L620 92 L740 46 L800 58 L860 30"/>
+      <!-- summit icon: star, menorah or kinara -->
+      <g transform="translate(860 18)" id="summit"></g>
+      <!-- hiker marker -->
+      <g class="hiker" id="hiker">
+        <circle r="9" fill="var(--accent)" stroke="var(--snow)" stroke-width="3"/>
+      </g>
+    </svg>
+    <div class="trail-meta">
+      <span>Trail to the summit</span>
+      <span id="pct"><strong>0%</strong> of the way there</span>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const root = document.getElementById('xmas');
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2,'0');
+
+  const DAY = 864e5;
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const SHORT  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const WEEK   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const fmt  = d => WEEK[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  const md   = d => MONTHS[d.getMonth()] + ' ' + d.getDate();
+
+  // Hanukkah follows the Hebrew calendar: first candle at sundown on these dates
+  // (source: Hebcal). Add new years here as needed.
+  const HANUKKAH = {2025:[11,14], 2026:[11,4], 2027:[11,24], 2028:[11,12], 2029:[11,1], 2030:[11,20], 2031:[11,9]};
+  const PRINCIPLES = [['Umoja','Unity'],['Kujichagulia','Self-determination'],['Ujima','Collective work and responsibility'],
+                      ['Ujamaa','Cooperative economics'],['Nia','Purpose'],['Kuumba','Creativity'],['Imani','Faith']];
+
+  const STAR = '<path fill="var(--lantern)" d="M0 -12 L3.5 -3.7 L12 -3.7 L5.2 1.6 L7.6 10 L0 5 L-7.6 10 L-5.2 1.6 L-12 -3.7 L-3.5 -3.7Z"/>';
+  function candles(xs, tops, cols){
+    return xs.map((x,i) => '<rect x="'+(x-1.1)+'" y="'+tops[i]+'" width="2.2" height="'+(4-tops[i])+'" fill="'+cols[i]+'" stroke="rgba(255,255,255,.55)" stroke-width="'+(cols[i]==='#111'?0.6:0)+'"/>'
+      + '<ellipse cx="'+x+'" cy="'+(tops[i]-2.4)+'" rx="1.4" ry="2.3" fill="var(--lantern)"/>').join('');
+  }
+  const MENORAH = (() => {
+    const xs=[-16,-12,-8,-4,0,4,8,12,16], tops=xs.map(x=>x===0?-9:-5), cols=xs.map(()=> '#DCE8FF');
+    return candles(xs,tops,cols) + '<rect x="-18" y="4" width="36" height="2.2" rx="1" fill="var(--lantern)"/>'
+      + '<rect x="-1.1" y="5" width="2.2" height="7" fill="var(--lantern)"/><rect x="-7" y="11" width="14" height="2.2" rx="1" fill="var(--lantern)"/>';
+  })();
+  const KINARA = (() => {
+    const xs=[-13.5,-9,-4.5,0,4.5,9,13.5], tops=xs.map(()=>-5);
+    const cols=['#C8102E','#C8102E','#C8102E','#111','#2E9B57','#2E9B57','#2E9B57'];
+    return candles(xs,tops,cols) + '<rect x="-16" y="4" width="32" height="3.2" rx="1.2" fill="#9A6A3A"/>'
+      + '<rect x="-12" y="7" width="24" height="3" rx="1" fill="#7A522C"/>';
+  })();
+
+  const TENT = '<path d="M0 -12 L13 9 L-13 9Z" fill="var(--lantern)"/><path d="M0 -1 L5.5 9 L-5.5 9Z" fill="#10241C"/><path d="M0 -12 L0 -16" stroke="var(--lantern)" stroke-width="1.8"/>';
+
+  const LAPTOP = '<rect x="-11" y="-12" width="22" height="14" rx="1.6" fill="var(--lantern)"/><rect x="-9" y="-10" width="18" height="10" fill="#10241C"/><path d="M-4 -2 L4 -8 M-3.5 -7.5 h.1 M3.5 -2.5 h.1" stroke="var(--lantern)" stroke-width="1.8" stroke-linecap="round"/><path d="M-14 3 H14 L12 7 H-12Z" fill="var(--lantern)"/>';
+
+  // Three illustrations per holiday, standing on the ridge (base of each drawing is y=0)
+  const ART = {
+    laptop: '<rect x="-13" y="-27" width="26" height="18" rx="2" fill="#CFE1E6"/><rect x="-11" y="-25" width="22" height="14" fill="#2A7F8F"/><path d="M-6 -21 H-3.5 L-1.5 -15 H5 L6.5 -19.5 H-2.5" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><circle cx="-0.5" cy="-13" r="1.1" fill="#fff"/><circle cx="4" cy="-13" r="1.1" fill="#fff"/><path d="M-17 -8 H17 L14 -2.5 H-14Z" fill="#9FB7BE"/><rect x="-4" y="-7" width="8" height="1.6" rx=".8" fill="#7E979E"/>',
+    bag: '<path d="M-6 -25 C-6 -33 6 -33 6 -25" fill="none" stroke="#B98A2A" stroke-width="2.6"/><path d="M-12 -25 H12 L14 0 H-14Z" fill="#F0B64A"/><path d="M12 -25 L14 0 H8Z" fill="#D9A13A"/><circle cx="-4" cy="-16" r="2.2" fill="#10241C"/><circle cx="4" cy="-7" r="2.2" fill="#10241C"/><path d="M5 -18 L-5 -5" stroke="#10241C" stroke-width="2.2" stroke-linecap="round"/>',
+    box: '<rect x="-14" y="-21" width="28" height="21" rx="1.5" fill="#C8955A"/><rect x="-14" y="-21" width="28" height="5" fill="#B07F48"/><rect x="-3" y="-21" width="6" height="10" fill="#E9D3B0"/><rect x="4.5" y="-9" width="7" height="5" rx="1" fill="#F3EEDF"/><path d="M-10 -5 H-3 M-10 -8 H-5" stroke="#7A522C" stroke-width="1.4" stroke-linecap="round"/>',
+    boot: '<path d="M-10 -28 H3 V-13 L14 -9 C17.5 -8 19 -5 19 -2.5 V0 H-10Z" fill="#8E5F33"/><path d="M-10 -4.5 H19 V0 H-10Z" fill="#3A2A1C"/><path d="M-6 -24 H0 M-6 -19.5 H0 M-6 -15 H1" stroke="#F0B64A" stroke-width="1.6" stroke-linecap="round"/><path d="M-10 -28 H3" stroke="#C8763F" stroke-width="3"/>',
+    donut: '<ellipse cx="0" cy="-9" rx="14" ry="9.5" fill="#D9A15C"/><ellipse cx="0" cy="-6" rx="14" ry="6" fill="#B97F3F" opacity=".45"/><path d="M-13 -12 C-8 -19.5 8 -19.5 13 -12 C8 -14.5 -8 -14.5 -13 -12Z" fill="#FFF8EE"/><circle cx="0" cy="-17.5" r="2.6" fill="#C8102E"/><circle cx="-6" cy="-10" r=".9" fill="#FFF8EE"/><circle cx="5" cy="-8" r=".9" fill="#FFF8EE"/><circle cx="8" cy="-12" r=".9" fill="#FFF8EE"/>',
+    zawadi: '<rect x="-12" y="-19" width="24" height="19" rx="2" fill="#1F7A3E"/><rect x="-2" y="-19" width="4" height="19" fill="#C8102E"/><rect x="-14" y="-24" width="28" height="6" rx="2" fill="#17602F"/><rect x="-14" y="-20" width="28" height="2" fill="#111"/><rect x="-2" y="-24" width="4" height="6" fill="#C8102E"/><path d="M0 -24 C-7 -32 -13 -27 0 -24 C13 -27 7 -32 0 -24Z" fill="none" stroke="#C8102E" stroke-width="2.4"/>',
+    tent: '<ellipse cx="0" cy="-6" rx="28" ry="12" fill="#F3C46A" opacity=".12"/><path d="M0 -26 L20 0 L-20 0Z" fill="#C8763F"/><path d="M0 -26 L20 0 L6 0Z" fill="#A85F31"/><path d="M0 -14 L6.5 0 L-6.5 0Z" fill="#F7D27A"/><path d="M0 -26 V-31" stroke="#4A3424" stroke-width="2"/>',
+    fire: '<circle cx="0" cy="-10" r="18" fill="#F3C46A" opacity=".13"/><path d="M-14 -1 L14 -7" stroke="#7A522C" stroke-width="4.5" stroke-linecap="round"/><path d="M-14 -7 L14 -1" stroke="#8E5F33" stroke-width="4.5" stroke-linecap="round"/><path d="M0 -28 C9 -18 11 -11 7 -6 C4 -2 -4 -2 -7 -6 C-11 -11 -8 -18 0 -28Z" fill="#F0B64A"/><path d="M0 -18 C4 -13 5 -9 2.5 -6 C1 -5 -1 -5 -2.5 -6 C-5 -9 -4 -13 0 -18Z" fill="#E0602A"/>',
+    pack: '<path d="M-6 -30 C-6 -37 6 -37 6 -30" fill="none" stroke="#2E5F8A" stroke-width="3"/><rect x="-11" y="-31" width="22" height="31" rx="6" fill="#3E7CB1"/><rect x="-11" y="-23" width="22" height="2.6" fill="#F0B64A"/><rect x="-8" y="-14" width="16" height="11" rx="3" fill="#2E5F8A"/><rect x="-15" y="-6" width="30" height="5" rx="2.5" fill="#C8763F"/>',
+    menorah: '<ellipse cx="0" cy="-12" rx="26" ry="14" fill="#F3C46A" opacity=".12"/><g transform="translate(0 -15) scale(1.15)">' + MENORAH + '</g>',
+    dreidel: '<path d="M-10 -25 L10 -25 L10 -9 L0 0 L-10 -9Z" fill="#5B8FD6"/><path d="M0 -25 L10 -25 L10 -9 L0 0Z" fill="#3E6FB0"/><rect x="-2" y="-32" width="4" height="7" rx="1.5" fill="#DCE8FF"/><path d="M-6 -20 V-14 H5 V-20 M-0.5 -20 V-14" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/>',
+    gelt: '<ellipse cx="0" cy="-3" rx="11" ry="4" fill="#B98A2A"/><ellipse cx="0" cy="-5" rx="11" ry="4" fill="#F0B64A"/><ellipse cx="3" cy="-10" rx="11" ry="4" fill="#B98A2A"/><ellipse cx="3" cy="-12" rx="11" ry="4" fill="#F0B64A"/><ellipse cx="-2" cy="-17" rx="11" ry="4" fill="#B98A2A"/><ellipse cx="-2" cy="-19" rx="11" ry="4" fill="#F7D27A"/><ellipse cx="-2" cy="-19" rx="6" ry="2" fill="none" stroke="#B98A2A" stroke-width="1"/>',
+    tree: '<circle cx="0" cy="-38" r="7" fill="#F0B64A" opacity=".2"/><polygon points="0,-38 -9,-26 9,-26" fill="#2F6B45"/><polygon points="0,-31 -13,-15 13,-15" fill="#2F6B45"/><polygon points="0,-22 -17,-4 17,-4" fill="#2F6B45"/><rect x="-2.5" y="-4" width="5" height="4" fill="#5A3D26"/><g><circle cx="-4" cy="-28" r="1.8" fill="#F0B64A"/><circle cx="5" cy="-20" r="1.8" fill="#D2232A"/><circle cx="-7" cy="-17" r="1.8" fill="#FFFFFF"/><circle cx="8" cy="-9" r="1.8" fill="#F0B64A"/><circle cx="-3" cy="-8" r="1.8" fill="#D2232A"/><circle cx="-11" cy="-7" r="1.8" fill="#FFFFFF"/></g><path fill="#F0B64A" transform="translate(0 -40) scale(.42)" d="M0 -12 L3.5 -3.7 L12 -3.7 L5.2 1.6 L7.6 10 L0 5 L-7.6 10 L-5.2 1.6 L-12 -3.7 L-3.5 -3.7Z"/>',
+    gift: '<rect x="-12" y="-19" width="24" height="19" rx="2" fill="#D2232A"/><rect x="-2" y="-19" width="4" height="19" fill="#F0B64A"/><rect x="-14" y="-24" width="28" height="6" rx="2" fill="#B81D24"/><rect x="-2" y="-24" width="4" height="6" fill="#F0B64A"/><path d="M0 -24 C-7 -32 -13 -27 0 -24 C13 -27 7 -32 0 -24Z" fill="none" stroke="#F0B64A" stroke-width="2.4"/>',
+    snowman: '<circle cx="0" cy="-10" r="10" fill="#F3EEDF"/><circle cx="0" cy="-25" r="7" fill="#FFFFFF"/><rect x="-7" y="-33" width="14" height="2.6" rx="1" fill="#1E1E1E"/><rect x="-4.5" y="-41" width="9" height="8.5" rx="1" fill="#1E1E1E"/><path d="M-7 -19 H7" stroke="#D2232A" stroke-width="3" stroke-linecap="round"/><path d="M0 -25 L7 -24" stroke="#E07A2F" stroke-width="2" stroke-linecap="round"/><circle cx="-2.5" cy="-27.5" r="1" fill="#1E1E1E"/><circle cx="2.5" cy="-27.5" r="1" fill="#1E1E1E"/>',
+    kinara: '<ellipse cx="0" cy="-10" rx="26" ry="14" fill="#F3C46A" opacity=".12"/><rect x="-22" y="-3" width="44" height="3" fill="#C8102E"/><rect x="-22" y="-3" width="44" height="1" fill="#111"/><rect x="-22" y="-1" width="44" height="1" fill="#2E9B57"/><g transform="translate(0 -15) scale(1.2)">' + KINARA + '</g>',
+    cup: '<path d="M-10 -29 L10 -29 C10 -19 6 -15 0 -14 C-6 -15 -10 -19 -10 -29Z" fill="#C9962E"/><path d="M-10 -29 L10 -29" stroke="#F7D27A" stroke-width="2"/><rect x="-1.6" y="-14" width="3.2" height="10" fill="#C9962E"/><rect x="-8" y="-4.5" width="16" height="4.5" rx="1.5" fill="#A97C25"/>',
+    corn: '<g transform="rotate(-14)"><ellipse cx="0" cy="-17" rx="5" ry="13" fill="#F0C14A"/><path d="M-1 -4 C-11 -8 -12 -22 -6 -31 C-6 -22 -4 -12 -1 -4Z M1 -4 C11 -8 12 -22 6 -31 C6 -22 4 -12 1 -4Z" fill="#5E8C3A"/></g><g transform="translate(10 0) rotate(14)"><ellipse cx="0" cy="-15" rx="4.5" ry="11" fill="#E9B23C"/><path d="M-1 -3 C-10 -7 -10 -19 -5 -27 C-5 -19 -3 -10 -1 -3Z M1 -3 C10 -7 10 -19 5 -27 C5 -19 3 -10 1 -3Z" fill="#4F7A30"/></g>'
+  };
+  const SCENES = { cybermonday:['laptop','bag','box'], hanukkah:['donut','dreidel','gelt'],
+                   christmas:['tree','gift','snowman'], kwanzaa:['zawadi','cup','corn'] };
+  const SPOTS = [[150,132],[380,112],[590,89]];   // on the ridge line, between the trees
+  const scene = id => (SCENES[id] || []).map((k,i) =>
+    '<g transform="translate(' + SPOTS[i][0] + ' ' + SPOTS[i][1] + ') scale(1.35)">' + ART[k] + '</g>').join('');
+
+  const HOLIDAYS = [
+    { id:'cybermonday', name:'Cyber Monday', icon:LAPTOP,
+      // The Monday after Thanksgiving (fourth Thursday of November)
+      occ(y){ const first = 1 + ((4 - new Date(y,10,1).getDay() + 7) % 7), cm = first + 25;
+              return { start:new Date(y,10,cm), end:new Date(y,10,cm+1) }; },
+      upcoming: o => 'Until ' + fmt(o.start),
+      during: () => ({ sub:'It’s Cyber Monday', big:'Happy Cyber Monday',
+                       msg:'One of the busiest online shopping days of the year. Thanks for helping our members gear up!' }) },
+    { id:'hanukkah', name:'Hanukkah', icon:MENORAH,
+      occ(y){ const d = HANUKKAH[y]; if (!d) return null;
+              return { start:new Date(y,d[0],d[1]), end:new Date(y,d[0],d[1]+9) }; },
+      upcoming: o => 'First candle at sundown, ' + fmt(o.start),
+      during(o, i){
+        const last = new Date(o.start.getFullYear(), o.start.getMonth(), o.start.getDate()+8);
+        const msg = i <= 7
+          ? (i === 0 ? 'Hanukkah begins tonight at sundown. ' : '') + 'Night ' + (i+1) + ' of 8 begins tonight. Wishing you eight bright nights.'
+          : 'Today is the final day of Hanukkah. Wishing you and yours a bright season.';
+        return { sub: md(o.start) + ' – ' + md(last) + ', ' + last.getFullYear(), big:'Happy Hanukkah', msg };
+      } },
+    { id:'christmas', name:'Christmas', icon:STAR,
+      occ: y => ({ start:new Date(y,11,25), end:new Date(y,11,26) }),
+      upcoming: o => 'Until ' + fmt(o.start),
+      during: () => ({ sub:'It’s December 25', big:'Merry Christmas',
+                       msg:'Thanks for all you do this season. Now go enjoy some time outside.' }) },
+    { id:'kwanzaa', name:'Kwanzaa', icon:KINARA,
+      occ: y => ({ start:new Date(y,11,26), end:new Date(y,11,33) }),
+      upcoming: o => 'Seven days of celebration begin ' + fmt(o.start),
+      during(o, i){ const p = PRINCIPLES[Math.min(i,6)];
+        return { sub:'December 26 – January 1', big:'Happy Kwanzaa',
+                 msg:'Day ' + (i+1) + ' of 7: ' + p[0] + ' (' + p[1] + '). Wishing you a joyful Kwanzaa.' }; } }
+  ];
+
+  // Next occurrence that hasn't ended yet (covers holidays that run past New Year's)
+  function nextOcc(h, now){
+    const y = now.getFullYear();
+    for (const yy of [y-1, y, y+1, y+2]) { const o = h.occ(yy); if (o && now < o.end) return o; }
+    return null;
+  }
+  const dayIdx = (now, start) => Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - start) / DAY);
+
+  // Holiday picker
+  const tabsEl = $('tabs'), summit = $('summit');
+  let chosen = null, manual = false, iconFor = null;
+  const btns = {};
+  HOLIDAYS.forEach(h => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tab';
+    b.innerHTML = h.name + '<span class="when"></span>';
+    b.addEventListener('click', () => { chosen = h.id; manual = true; tick(); });
+    tabsEl.appendChild(b); btns[h.id] = b;
+  });
+
+  function pickDefault(now){
+    let best = null, bestT = Infinity;
+    for (const h of HOLIDAYS) {
+      const o = nextOcc(h, now); if (!o) continue;
+      const t = now >= o.start ? -1 : o.start - now;   // happening now wins
+      if (t < bestT) { bestT = t; best = h.id; }
+    }
+    return best;
+  }
+
+  const path = $('path'), hiker = $('hiker');
+  const len = path.getTotalLength();
+
+  function tick(){
+    const now = new Date();
+    if (!manual || !chosen) chosen = pickDefault(now);
+
+    // Refresh the picker
+    HOLIDAYS.forEach(h => {
+      const o = nextOcc(h, now), b = btns[h.id];
+      b.hidden = !o;
+      if (o) b.querySelector('.when').textContent = SHORT[o.start.getMonth()] + ' ' + o.start.getDate();
+      b.setAttribute('aria-pressed', String(h.id === chosen));
+    });
+
+    const h = HOLIDAYS.find(x => x.id === chosen);
+    const o = h && nextOcc(h, now);
+    if (!o) return;
+    root.dataset.h = h.id;
+    if (iconFor !== h.id) { summit.innerHTML = (h.id === 'christmas' || h.id === 'cybermonday') ? h.icon : '<g transform="translate(0 -2) scale(1.45)">' + h.icon + '</g>'; $('scene').innerHTML = scene(h.id); iconFor = h.id; }
+
+    const active = now >= o.start;
+    root.classList.toggle('is-celebrating', active);
+    $('xmas-title').textContent = active ? (h.here || h.name + ' is here') : 'Countdown to ' + (h.title || h.name);
+
+    if (active){
+      const d = h.during(o, dayIdx(now, o.start));
+      $('sub').textContent = d.sub; $('mbig').textContent = d.big; $('mmsg').textContent = d.msg;
+      placeHiker(0.955); $('pct').innerHTML = '<strong>Summit reached</strong>';
+      return;
+    }
+
+    let diff = Math.max(0, o.start - now);
+    const dd = Math.floor(diff / DAY); diff -= dd * DAY;
+    const hh = Math.floor(diff / 36e5);  diff -= hh * 36e5;
+    const mm = Math.floor(diff / 6e4);   diff -= mm * 6e4;
+    const ss = Math.floor(diff / 1e3);
+
+    $('d').textContent = dd;
+    $('h').textContent = pad(hh);
+    $('m').textContent = pad(mm);
+    $('s').textContent = pad(ss);
+    root.querySelector('.unit.days .lbl').textContent = dd === 1 ? 'day' : 'days';
+    $('sub').textContent = h.upcoming(o);
+
+    // The season climb starts Oct 1 and summits on the holiday
+    const start = new Date(o.start.getFullYear(), 9, 1);
+    const p = Math.min(1, Math.max(0, (now - start) / (o.start - start)));
+    placeHiker(p * 0.955);
+    $('pct').innerHTML = now < start
+      ? 'The climb starts October 1'
+      : '<strong>' + Math.round(p*100) + '%</strong> of the way there';
+  }
+
+  function placeHiker(p){
+    const pt = path.getPointAtLength(len * p);
+    hiker.setAttribute('transform', 'translate(' + pt.x + ' ' + (pt.y - 4) + ')');
+  }
+
+  tick();
+  setInterval(tick, 1000);
+
+  // Gentle snowfall
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cv = root.querySelector('canvas.snow');
+  if (reduce || !cv.getContext) return;
+  const ctx = cv.getContext('2d');
+  let W, H, flakes = [];
+  function size(){
+    const r = root.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    const count = Math.round(W / 9);
+    flakes = Array.from({length: count}, () => ({
+      x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()*1.8 + .6, v: Math.random()*.5 + .25, drift: Math.random()*.6 - .3,
+      o: Math.random()*.5 + .35
+    }));
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for (const f of flakes){
+      f.y += f.v; f.x += f.drift;
+      if (f.y > H) { f.y = -4; f.x = Math.random()*W; }
+      if (f.x > W) f.x = 0; if (f.x < 0) f.x = W;
+      ctx.globalAlpha = f.o; ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2); ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  new ResizeObserver(size).observe(root);
+  size(); draw();
+})();
+</script>
+</body>
+</html>
